@@ -1,134 +1,3 @@
-# easy-s3
-将AWS S3大文件文件上传相关的API集成为js文件，功能包括多文件并行上传、文件分片上传、断点续传、文件分片合成、上传暂停、取消上传、文件上传进度条显示。
-
-暂时不包括文件分片下载相关功能，可后续迭代。
-
-### 一、API
-
-#### 1、init
-
-传入以下参数，初始化s3客户端
-
-![image-20230725111758958](C:\Users\龚可\AppData\Roaming\Typora\typora-user-images\image-20230725111758958.png)
-
-#### 2、fileChange
-
-加入文件上传任务，使用该方法
-
-传入参数：
-
-```javascript
-fileChange({ fileList, bucket, changeStatus, getSuspend, changeSharding } )   //注意，传入的是一个map
-
-/**
-	fileList:文件信息数组,其内部元素的结构为
-	{
-		percentage: 0,//该文件的上传进度，如果不需要展示进度的话，可以不传 false
-		status: 'wait',//文件上传的状态  true
-		file: file,//需要上传的文件   true
-		needSuspend: false,//是否暂停  true
-		sharding: [],//分片数组，该文件已经上传了那些分片  true
-		shardSize: 32 * 1024 * 1024//该文件每个分片的大小   true
-	}
-*/
-
-/**
-	bucket：文件上传到s3上的bucket名称
-*/
-
-/**
-	changeStatus：一个事件，前端页面定义的可以改变文件上传的状态的事件
-	示例：
-	changeStatus(name, val) {//传入参数 name：文件名称   val：文件状态
-            for (let i = 0; i < this.fileList.length; i++) {
-                if (this.fileList[i].file.name == name) {
-                    this.fileList[i].status = val;
-                    if (val === 'success') {
-                        this.fileList[i].percentage = 100;
-                    }
-                    break;
-                }
-            }
-        },
-
-*/
-
-
-/**
-	getSuspend：一个事件，前端页面定义的可以获取该文件上传是否暂停的事件
-	示例：
-	getSuspend(name) {//传入参数 name : 该文件的名称
-            let suspend = this.fileList.filter(e => {
-                return e.file.name === name;
-            });
-            if (suspend.length != 0) {
-                return suspend[0].needSuspend;
-            }
-            return false;
-     },
-*/
-/**
-	changeSharding：前端页面定义的可以改变该文件的已经上传分片的事件
-	示例：
-	changeSharding(name, shard) {//传入参数 name：文件的名称  shard：文件已经上传的分片
-            for (let i = 0; i < this.fileList.length; i++) {
-                if (this.fileList[i].file.name === name) {
-                    this.fileList[i].sharding = shard;
-                    //改变进度条
-                    let size = 0;
-                    for (let j = 0; j < shard.length; j++) {
-                        size += shard[j].Size;
-                    }
-                    //计算该文件的上传进度
-                    this.fileList[i].percentage = ((size / this.fileList[i].file.size) * 100).toFixed(1) - 0;
-                    return;
-                }
-            }
-        },
-*/
-```
-
-
-
-#### 3、cancel
-
-取消一个文件的上传
-
-```javascript
-cancel({ bucket, file })//注意，传入的是一个map
-/**
-	bucket：文件上传到s3上的bucket名称
-*/
-/**
-	file：取消的文件
-*/
-```
-
-#### 4、getWorker
-
-判断某个文件是否正在上传，或已经在上传任务中了
-
-使用场景：对文件上传任务点击继续时，判断是否需要将该文件加入到上传任务队列中，因为对该文件的上传 短时间内频繁点击暂停、继续按钮时，可能会导致重复加入同一个文件的上传任务
-
-（只有该任务终止，才应该加入上传队列）
-
-（文件上传分片之前会判断该文件是否已经暂停上传，暂停的话，就会终止任务；或者文件分片上传出错的话，也会终止任务）
-
-```javascript
-getWorker(file)
-/**
-	file:文件
-*/
-返回值：false：没有正在上传   true：正在上传
-```
-
-
-
-### 二、封装的API使用示例
-
-#### 
-
-```javascript
 <template>
     <div class="about">
         <div style="display: flex;justify-content: center;align-items: center;">
@@ -257,7 +126,6 @@ export default {
         },
         //修改状态
         changeStatus(name, val) {
-            //TODO 改变进度条
             for (let i = 0; i < this.fileList.length; i++) {
                 if (this.fileList[i].file.name == name) {
                     this.fileList[i].status = val;
@@ -302,5 +170,3 @@ export default {
     }
 }
 </script>
-```
-
