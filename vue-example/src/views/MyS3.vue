@@ -67,8 +67,8 @@ export default {
                 forcePathStyle: true,
 
                 credentials: {
-                    accessKeyId: '0r7OhuS86vkBc7it',
-                    secretAccessKey: '14DCVAwMX4FYhQno8OLRRyVKAbJkPfcY'
+                    accessKeyId: 'xxxxxx',
+                    secretAccessKey: 'xxxxxxxx'
                 },
             }//s3配置文件
         }
