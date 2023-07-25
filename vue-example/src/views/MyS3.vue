@@ -18,6 +18,10 @@
                     <el-input v-model="s3Clent.credentials.secretAccessKey"></el-input>
                 </el-form-item>
             </el-form>
+            
+        </div>
+        <div style="margin:20px 0px 20px 0px">
+            <el-button @click="sureS3()">确定</el-button>
         </div>
         <input multiple v-show="false" ref="fileRef" type="file" @change="inputFile">
         <el-button type="primary" @click="upload()">点击上传文件</el-button>
@@ -107,6 +111,9 @@ export default {
             this.$refs.fileRef.dispatchEvent(new MouseEvent('click'));
         },
         inputFile(event) {
+            if (this.s3Clent.credentials.accessKeyId == "xxxxxx") {
+                init(this.s3Clent);
+            }
             let files = event.target.files;
             let addFile = [];
             for (let i = 0; i < files.length; i++) {
@@ -176,11 +183,14 @@ export default {
             }
             return false;
         },
+        sureS3() {
+            //创建客户端
+            init(this.s3Clent);
+        }
 
     },
     created() {
-        //创建客户端
-        init(this.s3Clent);
+
     }
 }
 </script>
