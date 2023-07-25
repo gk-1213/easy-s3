@@ -10,8 +10,8 @@ init({
        signatureVersion: 'v4',
        forcePathStyle: true,//非必填 默认true
        credentials: {
-           accessKeyId: '0r7OhuS86vkBc7it',
-           secretAccessKey: '14DCVAwMX4FYhQno8OLRRyVKAbJkPfcY'
+           accessKeyId: 'xxxxxxxxxxx',
+           secretAccessKey: 'xxxxxxxxxxxx'
        },
     fragmentationSize:32,//非必填，默认32 即每个分片的大小为32M 必须大于等于5
 });
