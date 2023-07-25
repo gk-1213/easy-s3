@@ -39,11 +39,8 @@ fileChange({ fileList, bucket, changeStatus, getSuspend, changeSharding } )   //
 /**
 	fileList:文件信息数组,其内部元素的结构为
 	{
-	    key："",//文件对象名，一般为文件的名称，也可根据需求自定义                 true
-		percentage: 0,//该文件的上传进度，如果不需要展示进度的话，可以不传          false
-		status: 'wait',//文件上传的状态 ，分为4种  err：上传错误  same key：存在同个对象名上传事件  success：上传成功  suspend：上传暂停     false
+                key："",//文件对象名，一般为文件的名称，也可根据需求自定义  true
 		file: file,//需要上传的文件   true
-		needSuspend: false,//是否暂停  false
 		sharding: [],//分片数组，该文件已经上传了那些分片  true
 		shardSize: 32 * 1024 * 1024//该文件每个分片的大小   true
 	}
@@ -117,7 +114,13 @@ cancel({ bucket, f })//注意，传入的是一个map
 	bucket：文件上传到s3上的bucket名称
 */
 /**
-	f：取消的文件信息 （fileInformation）
+	f：取消的文件信息对象,对象结构为
+	{
+                key："",//文件对象名，一般为文件的名称，也可根据需求自定义  true
+		file: file,//需要上传的文件   true
+		sharding: [],//分片数组，该文件已经上传了那些分片  true
+		shardSize: 32 * 1024 * 1024//该文件每个分片的大小   true
+	}
 */
 返回值  false：取消失败  true：文件上传事件取消成功
 ```
