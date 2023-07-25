@@ -22,15 +22,15 @@
         <input multiple v-show="false" ref="fileRef" type="file" @change="inputFile">
         <el-button type="primary" @click="upload()">点击上传文件</el-button>
 
-        <div v-for="f in fileList" :key="f.file.name">
+        <div v-for="f in fileList" :key="f.key">
             <div style="margin-top:50px;display: flex;align-items: center;justify-content: center;" v-if="f.show">
                 <div style="margin-right:20px;font-size:15px;font-weight:60">
-                    {{ f.file.name }}
+                    {{ f.key }}
                 </div>
                 <el-progress :percentage="f.percentage" style="width:500px"></el-progress>
                 <div style="margin-left:20px">
                     <span v-if="f.status == 'err'" style="color:#F56C6C">上传错误</span>
-                    <span v-else-if="f.status == 'same name'" style="color:#F56C6C">同名文件</span>
+                    <span v-else-if="f.status == 'same key'" style="color:#F56C6C">同名文件</span>
                     <span v-else-if="f.status == 'success'" style="color:#67C23A">上传成功</span>
                     <span v-else-if="f.status == 'suspend'" style="color:#409EFF">已暂停</span>
                 </div>
@@ -77,19 +77,31 @@ export default {
         async continuedButton(file) {
             file.needSuspend = false;
             file.status = 'wait';
-            const isInQueue = getWorker(file.file);
+            const isInQueue = getWorker(file.key);
             console.log("isInQueue", isInQueue)
             if (isInQueue === false) {
                 //如果任务队列中没有这个文件上传任务，那么就加入到任务队列中
-                fileChange({ fileList: [file], bucket: 'test', changeStatus: this.changeStatus, getSuspend: this.getSuspend, changeSharding: this.changeSharding });
+                let inputFile = {
+                    key: file.name,//文件对象名(一般为文件的名称，也可根据需求自定)
+                    percentage: file.percentage,
+                    status: file.status,
+                    show: file.show,
+                    file: file.file,
+                    needSuspend: file.needSuspend,
+                    sharding: file.sharding,//分片数组
+                    shardSize: file.shardSize//每个分片的大小
+                }
+                fileChange({ fileList: [inputFile], bucket: 'test', changeStatus: this.changeStatus, getSuspend: this.getSuspend, changeSharding: this.changeSharding });
             }
 
         },
         async cancelButton(f) {
-            await cancel({ bucket: 'test', file: f.file });
-            this.fileList = this.fileList.filter(e => {
-                return e.file.name !== f.file.name;
-            });
+            let result = await cancel({ bucket: 'test', f: f });
+            if (result == true) {
+                this.fileList = this.fileList.filter(e => {
+                    return e.key !== f.key;
+                });
+            }
         },
         upload() {
             this.$refs.fileRef.dispatchEvent(new MouseEvent('click'));
@@ -99,6 +111,7 @@ export default {
             let addFile = [];
             for (let i = 0; i < files.length; i++) {
                 this.fileList.push({
+                    key: files[i].name,//文件对象名(一般为文件的名称，也可根据需求自定)
                     percentage: 0,
                     status: 'wait',
                     show: true,
@@ -108,6 +121,7 @@ export default {
                     shardSize: 32 * 1024 * 1024//每个分片的大小
                 });
                 addFile.push({
+                    key: files[i].name,//文件对象名(一般为文件的名称，也可根据需求自定)
                     percentage: 0,
                     status: 'wait',
                     show: true,
@@ -125,9 +139,10 @@ export default {
             file.status = 'suspend';
         },
         //修改状态
-        changeStatus(name, val) {
+        changeStatus(key, val) {
+            console.log('val')
             for (let i = 0; i < this.fileList.length; i++) {
-                if (this.fileList[i].file.name == name) {
+                if (this.fileList[i].key == key) {
                     this.fileList[i].status = val;
                     if (val === 'success') {
                         this.fileList[i].percentage = 100;
@@ -137,10 +152,9 @@ export default {
             }
         },
         //修改分片数组
-        changeSharding(name, shard) {
-            console.log(shard)
+        changeSharding(key, shard) {
             for (let i = 0; i < this.fileList.length; i++) {
-                if (this.fileList[i].file.name === name) {
+                if (this.fileList[i].key === key) {
                     this.fileList[i].sharding = shard;
                     //改变进度条
                     let size = 0;
@@ -153,9 +167,9 @@ export default {
             }
         },
         //获取该文件是否需要暂停
-        getSuspend(name) {
+        getSuspend(key) {
             let suspend = this.fileList.filter(e => {
-                return e.file.name === name;
+                return e.key === key;
             });
             if (suspend.length != 0) {
                 return suspend[0].needSuspend;

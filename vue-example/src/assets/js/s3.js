@@ -100,12 +100,13 @@ export function init({
 }
 
 //取消文件上传
-export async function cancel({ bucket, file }) {
-    if (bucket == undefined || file == undefined) {
-        return console.log("取消文件失败，请检查事件参数是否填写完整");
+export async function cancel({ bucket, f }) {
+    if (bucket == undefined || f == undefined) {
+        console.log("取消文件失败，请检查事件参数是否填写完整")
+        return false;
     }
     //查询是否还有其它连接
-    const listUploads = await listMultipartUploadsCommand({ bucket: bucket, name: file.name });
+    const listUploads = await listMultipartUploadsCommand({ bucket: bucket, key: f.key });
     if (listUploads.Uploads != undefined && listUploads.Uploads.length > 0) {
         const uploads = listUploads.Uploads;
         for (const one in uploads) {
@@ -113,22 +114,26 @@ export async function cancel({ bucket, file }) {
             const uploadId = uploadOne.UploadId;//UploadId
             const key = uploadOne.Key;//key
             //取消事件
-            await abortMultipartUpload({ bucket: bucket, key: key, uploadId: uploadId });
+            let result = await abortMultipartUpload({ bucket: bucket, key: key, uploadId: uploadId });
+            if(result == 'err'){
+                return false;
+            }
         }
     }
+    return true;
 }
 //获取任务队列是否有该文件的上传任务
-export function getWorker(file) {
+export function getWorker(key) {
     const list = queue.list;
     const worklist = queue.workList;
     for (const l in list) {
         let f = list[l][3];
-        if (f.file.name === file.name) {
+        if (f.key === key) {
             return true;
         }
     }
     for (const w in worklist) {
-        if (worklist[w] != undefined && worklist[w].file.name === file.name) {
+        if (worklist[w] != undefined && worklist[w].key === key) {
             return true;
         }
     }
@@ -154,49 +159,49 @@ export async function fileChange({ fileList, bucket, changeStatus, getSuspend, c
 //查询文件是否存在于bucket或者正在上传
 async function exist(bucket, fileInformation, changeStatus, getSuspend, changeSharding) {
     // 1、查询该文件是否已上传到bucket
-    let needSuspend = getSuspend(fileInformation.file.name);//判断前端是否暂停了该文件上传
+    let needSuspend = getSuspend(fileInformation.key);//判断前端是否暂停了该文件上传
     if (needSuspend === false) {//不需要暂停
         //判断sharding里面是否有东西，有东西证明已经上传过分片了，不需要再进行检测
         if (fileInformation.sharding.length === 0) {
             let existBucket = await existInBucket({ bucket, fileInformation: fileInformation });
+            console.log("existBucket", existBucket)
             if (existBucket === 'true') {
-                changeStatus(fileInformation.file.name, 'success');//直接告诉前端，状态
+                changeStatus(fileInformation.key, 'success');//直接告诉前端，状态
                 return;
-            } else if (existBucket === 'same name') {
-                console.log(fileInformation.file.name + "  bucket中存在同名不同内容的文件");
+            } else if (existBucket === 'same key') {
+                console.log(fileInformation.key + "  bucket中存在同名不同内容的文件");
             } else if (existBucket === 'not exist') {
-                console.log(fileInformation.file.name + "  bucket中不存在该文件");
+                console.log(fileInformation.key + "  bucket中不存在该文件");
             }
-            needSuspend = getSuspend(fileInformation.file.name);//再次判断前端是否暂停了该文件上传
+            needSuspend = getSuspend(fileInformation.key);//再次判断前端是否暂停了该文件上传
             if (needSuspend === false) {
                 //2、查询该文件是否存在上传事件
                 let upload = await existUpload({ bucket: bucket, fileInformation: fileInformation });
                 if (upload.code === 0) {
                     //存在该上传事件并且已经上传了多个分片
-                    console.log(fileInformation.file.name + "  存在上传事件，并已经上传多个分片");
+                    console.log(fileInformation.key + "  存在上传事件，并已经上传多个分片");
                     //将分片存入sharding
                     const uploadId = upload.uploadId;
                     let parts = upload.parts;
                     for (let i = 0; i < parts.length; i++) {
                         fileInformation.sharding.push({ ETag: parts[i].ETag, PartNumber: parts[i].PartNumber, Size: parts[i].Size, UploadId: uploadId });
                     }
-                    changeSharding(fileInformation.file.name, fileInformation.sharding);//告诉前端，加入分片
+                    changeSharding(fileInformation.key, fileInformation.sharding);//告诉前端，加入分片
                     //重新上传
                     await uploadFile({ fileInformation: fileInformation, uploadId: uploadId, bucket, changeStatus, getSuspend, changeSharding });
                 } else if (upload.code === 1) {
                     // //重名但是不同文件
                     console.log('err 重名文件')
-                    changeStatus(fileInformation.file.name, 'same name');
+                    changeStatus(fileInformation.key, 'same key');
                 } else if (upload.code === 2) {
                     //没有上传事件
-                    console.log(fileInformation.file.name + "  不存在上传事件");
+                    console.log(fileInformation.key + "  不存在上传事件");
                     //建立分段上传事件
-                    const connect = await createMultipartUpload({ bucket: bucket, key: fileInformation.file.name, type: fileInformation.file.type });
+                    const connect = await createMultipartUpload({ bucket: bucket, key: fileInformation.key, type: fileInformation.file.type });
                     //上传整个文件
                     await uploadFile({ fileInformation: fileInformation, uploadId: connect.UploadId, bucket: bucket, changeStatus, getSuspend, changeSharding });
                 }
             } else {
-                // changeStatus(fileInformation.file.name, 'suspend');//通知前端，暂停了
                 return;
             }
         } else {
@@ -205,7 +210,6 @@ async function exist(bucket, fileInformation, changeStatus, getSuspend, changeSh
             await uploadFile({ fileInformation: fileInformation, uploadId: fileInformation.sharding[0].UploadId, bucket, changeStatus, getSuspend, changeSharding });
         }
     } else {
-        // changeStatus(fileInformation.file.name, 'suspend');//通知前端，暂停了
         return;
     }
 }
@@ -215,7 +219,7 @@ async function uploadFile({ fileInformation, uploadId, bucket, changeStatus, get
     const chunkCount = Math.ceil(fileInformation.file.size / fileInformation.shardSize)//总分片数
     //循环切片并上传
     for (let i = 0; i < chunkCount; i++) {
-        let needSuspend = getSuspend(fileInformation.file.name);//获取前端暂停状态
+        let needSuspend = getSuspend(fileInformation.key);//获取前端暂停状态
         if (needSuspend === false) {   //在不需要暂停的情况下使用
             let start = i * fileInformation.shardSize;//文件分片开始位置
             let end = Math.min(fileInformation.file.size, start + fileInformation.shardSize)//文件分片结束位置
@@ -226,7 +230,7 @@ async function uploadFile({ fileInformation, uploadId, bucket, changeStatus, get
             });
             if (res1.length === 0) {
                 //不包含该分片
-                const upload = await uploadPart({ f: _chunkFile, uploadId: uploadId, key: fileInformation.file.name, bucket: bucket, num: i + 1 });//将分片上传
+                const upload = await uploadPart({ f: _chunkFile, uploadId: uploadId, key: fileInformation.key, bucket: bucket, num: i + 1 });//将分片上传
                 //判断sharding中是否存在该分片，如果不存在的话，才判错
                 let res2 = fileInformation.sharding.filter((part) => {
                     return part.PartNumber === (i + 1);
@@ -240,27 +244,26 @@ async function uploadFile({ fileInformation, uploadId, bucket, changeStatus, get
                         });
                         if (res3.length === 0) {
                             fileInformation.sharding.push({ ETag: upload.ETag, PartNumber: i + 1, Size: _chunkFile.size, UploadId: uploadId });//上传成功，存到sharding
-                            changeSharding(fileInformation.file.name, fileInformation.sharding);
+                            changeSharding(fileInformation.key, fileInformation.sharding);
                         }
                     } else if (upload === 'err') {
-                        changeStatus(fileInformation.file.name, 'err');
+                        changeStatus(fileInformation.key, 'err');
                         return;
                     }
                 }
 
             }
         } else {
-            // changeStatus(fileInformation.file.name, 'suspend');//通知前端，暂停了
             return;
         }
     }//for
     if (fileInformation.sharding.length === chunkCount) {
         //合并分片
-        const complete = await completeMultipartUpload({ bucket: bucket, key: fileInformation.file.name, sharding: fileInformation.sharding, uploadId: uploadId });
+        const complete = await completeMultipartUpload({ bucket: bucket, key: fileInformation.key, sharding: fileInformation.sharding, uploadId: uploadId });
         if (complete != 'err') {
-            changeStatus(fileInformation.file.name, 'success');//通知前端，上传成功
+            changeStatus(fileInformation.key, 'success');//通知前端，上传成功
         } else {
-            changeStatus(fileInformation.file.name, 'err');//通知前端，上传失败
+            changeStatus(fileInformation.key, 'err');//通知前端，上传失败
         }
         return;
     }
@@ -268,7 +271,7 @@ async function uploadFile({ fileInformation, uploadId, bucket, changeStatus, get
 
 // 判断该文件是否已经存在于bucket   
 // bucket   file:上传文件
-// 返回值  'same name':同名不同文件 'not exist':不存在该文件  'true':该文件已存在bucket中
+// 返回值  'same key':同名不同文件 'not exist':不存在该文件  'true':该文件已存在bucket中
 async function existInBucket({ bucket, fileInformation }) {
     if (s3 === null) {
         return console.log("未创建s3客户端，请先调用init事件");
@@ -281,7 +284,7 @@ async function existInBucket({ bucket, fileInformation }) {
         count = 4;
     }
     for (let i = 0; i < count; i++) {
-        const obj = await getObject({ bucket: bucket, file: fileInformation.file, count: i });
+        const obj = await getObject({ bucket: bucket, fileInformation: fileInformation, count: i });
         if (obj != 'err') {
             //获取文件的文件体 计算某个分片的md5
             const fileBody = obj.Body;
@@ -292,11 +295,12 @@ async function existInBucket({ bucket, fileInformation }) {
         }
     }
     let bucketFileBufferArray = new Uint8Array(bucketFileUniArray);
+    console.log("bucketFileBufferArray.buffer", bucketFileBufferArray.buffer)
     // 将传入文件的fileReader 转成  arrayBuffer
     let fileArrayBuff = null;
     fileArrayBuff = await new Promise((resolve) => {
         let fileReader = new FileReader();
-        fileReader.readAsArrayBuffer(fileInformation.file);
+        fileReader.readAsArrayBuffer(fileInformation.file.slice(0, count * 767448));
         fileReader.onload = (e) => {
             resolve(e.target.result);
         };
@@ -310,16 +314,16 @@ async function existInBucket({ bucket, fileInformation }) {
         //证明是同一个文件 秒传
         return 'true';
     } else {
-        return 'same name';
+        return 'same key';
     }
 }
 
 //判断该文件是否正在上传
 // bucket:bucket   file:上传文件 
-//返回值 'not exist upload':不存在上传事件  'same name':同名不同文件 
+//返回值 'not exist upload':不存在上传事件  'same key':同名不同文件 
 async function existUpload({ bucket, fileInformation }) {
     //判断该文件是否有上传事件
-    const listUploads = await listMultipartUploadsCommand({ bucket: bucket, name: fileInformation.file.name });
+    const listUploads = await listMultipartUploadsCommand({ bucket: bucket, key: fileInformation.key });
     if (listUploads != 'err') {
         if (listUploads.Uploads != undefined && listUploads.Uploads.length > 0) {
             //存在上传事件 获取上传的第一个分片的eTag，计算传入文件md5，相比较是否相同
@@ -375,7 +379,7 @@ async function existUpload({ bucket, fileInformation }) {
             }//for
             return {
                 code: 1,
-                message: 'same name'
+                message: 'same key'
             }
         } else {
             //无连接
@@ -395,6 +399,7 @@ async function existUpload({ bucket, fileInformation }) {
 
 //计算arrayBuffer的md5值
 async function getMD5({ arrayBuffer }) {
+    console.log("arrayBuffer", arrayBuffer)
     let md5 = await new Promise((resolve) => {
         var spark = new SparkMD5.ArrayBuffer();
         spark.append(arrayBuffer);
@@ -503,7 +508,7 @@ async function listPartsCommand({ bucket, key, uploadId }) {
     return res();
 }
 //查询该文件是否存在上传事件
-async function listMultipartUploadsCommand({ bucket, name }) {
+async function listMultipartUploadsCommand({ bucket, key }) {
     if (s3 === null) {
         return console.log("未创建s3客户端，请先调用init事件");
     }
@@ -511,14 +516,14 @@ async function listMultipartUploadsCommand({ bucket, name }) {
         Bucket: bucket,
         Delimiter: '',
         MaxUploads: 1000,
-        Prefix: name
+        Prefix: key
     };
     const res = async () => {
         try {
             const data = await s3.send(new ListMultipartUploadsCommand(params));
             return data;
         } catch (err) {
-            console.log("查询 " + name + " 文件是否存在上传事件失败: " + err.message);
+            console.log("查询 " + key + " 文件是否存在上传事件失败: " + err.message);
             return 'err';
         }
     }
@@ -546,17 +551,17 @@ async function abortMultipartUpload({ bucket, key, uploadId }) {
     return res();
 }
 //获取文件
-async function getObject({ bucket, file, count }) {
+async function getObject({ bucket, fileInformation, count }) {
     //一次请求最多 767448 
     if (s3 === null) {
         return console.log("未创建s3客户端，请先调用init事件");
     }
-    let byte1 = ((count + 1) * 767448 - 1) > file.size ? file.size : ((count + 1) * 767448 - 1);
-    let byte2 = (count * 767448) > file.size ? file.size : (count * 767448);
+    let byte1 = ((count + 1) * 767448 - 1) > fileInformation.file.size ? fileInformation.file.size : ((count + 1) * 767448 - 1);
+    let byte2 = (count * 767448) > fileInformation.file.size ? fileInformation.file.size : (count * 767448);
     let range = "bytes=" + byte2 + "-" + byte1;
     const params = {
         Bucket: bucket,
-        Key: file.name,
+        Key: fileInformation.key,
         Range: range
     };
     const res = async () => {
@@ -564,7 +569,7 @@ async function getObject({ bucket, file, count }) {
             const data = await s3.send(new GetObjectCommand(params));
             return data;
         } catch (err) {
-            console.log('获取 ' + file.name + ' 文件失败：', err.message);
+            console.log('获取 ' + fileInformation.key + ' 文件失败：', err.message);
             return 'err';
         }
     }
