@@ -96,7 +96,7 @@ export default {
 
         },
         async cancelButton(f) {
-            let result = await cancel({ bucket: 'test', f: f });
+            let result = await cancel({ bucket: 'test', fKey: f.key });
             if (result == true) {
                 this.fileList = this.fileList.filter(e => {
                     return e.key !== f.key;

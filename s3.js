@@ -100,14 +100,14 @@ export function init({
 }
 
 //取消文件上传
-export async function cancel({ bucket, f }) {
-    if (bucket == undefined || f == undefined) {
+export async function cancel({ bucket, fKey }) {
+    if (bucket === undefined || fKey === undefined) {
         console.log("取消文件失败，请检查事件参数是否填写完整")
         return false;
     }
     //查询是否还有其它连接
-    const listUploads = await listMultipartUploadsCommand({ bucket: bucket, key: f.key });
-    if (listUploads.Uploads != undefined && listUploads.Uploads.length > 0) {
+    const listUploads = await listMultipartUploadsCommand({ bucket: bucket, key: fKey });
+    if (listUploads.Uploads !== undefined && listUploads.Uploads.length > 0) {
         const uploads = listUploads.Uploads;
         for (const one in uploads) {
             let uploadOne = uploads[one];
@@ -115,7 +115,7 @@ export async function cancel({ bucket, f }) {
             const key = uploadOne.Key;//key
             //取消事件
             let result = await abortMultipartUpload({ bucket: bucket, key: key, uploadId: uploadId });
-            if(result == 'err'){
+            if(result === 'err'){
                 return false;
             }
         }
@@ -133,7 +133,7 @@ export function getWorker(key) {
         }
     }
     for (const w in worklist) {
-        if (worklist[w] != undefined && worklist[w].key === key) {
+        if (worklist[w] !== undefined && worklist[w].key === key) {
             return true;
         }
     }
@@ -143,7 +143,7 @@ export function getWorker(key) {
 
 //上传文件操作 将文件加入到队列
 export async function fileChange({ fileList, bucket, changeStatus, getSuspend, changeSharding }) {
-    if (fileList == undefined || bucket == undefined || changeSharding == undefined || changeStatus == undefined || getSuspend == undefined) {
+    if (fileList === undefined || bucket === undefined || changeSharding === undefined || changeStatus === undefined || getSuspend === undefined) {
         return console.log("上传文件失败，请检查参数是否填写完整")
     }
     if (s3 === null) {
@@ -260,12 +260,12 @@ async function uploadFile({ fileInformation, uploadId, bucket, changeStatus, get
     if (fileInformation.sharding.length === chunkCount) {
         //合并分片
         const complete = await completeMultipartUpload({ bucket: bucket, key: fileInformation.key, sharding: fileInformation.sharding, uploadId: uploadId });
-        if (complete != 'err') {
+        if (complete !== 'err') {
             changeStatus(fileInformation.key, 'success');//通知前端，上传成功
         } else {
             changeStatus(fileInformation.key, 'err');//通知前端，上传失败
         }
-        return;
+
     }
 }
 
@@ -285,7 +285,7 @@ async function existInBucket({ bucket, fileInformation }) {
     }
     for (let i = 0; i < count; i++) {
         const obj = await getObject({ bucket: bucket, fileInformation: fileInformation, count: i });
-        if (obj != 'err') {
+        if (obj !== 'err') {
             //获取文件的文件体 计算某个分片的md5
             const fileBody = obj.Body;
             let fileUnitArray = await fileBody.transformToByteArray();
@@ -324,8 +324,8 @@ async function existInBucket({ bucket, fileInformation }) {
 async function existUpload({ bucket, fileInformation }) {
     //判断该文件是否有上传事件
     const listUploads = await listMultipartUploadsCommand({ bucket: bucket, key: fileInformation.key });
-    if (listUploads != 'err') {
-        if (listUploads.Uploads != undefined && listUploads.Uploads.length > 0) {
+    if (listUploads !== 'err') {
+        if (listUploads.Uploads !== undefined && listUploads.Uploads.length > 0) {
             //存在上传事件 获取上传的第一个分片的eTag，计算传入文件md5，相比较是否相同
             const uploads = listUploads.Uploads;
             for (const one in uploads) {//可能存在多个连接
@@ -334,8 +334,8 @@ async function existUpload({ bucket, fileInformation }) {
                 const key = uploadOne.Key;//key
                 //查询该文件已上传分片
                 const listParts = await listPartsCommand({ bucket: bucket, key: key, uploadId: uploadId });
-                if (listParts != 'err') {
-                    if (listParts.Parts != undefined && listParts.Parts.length != 0) {
+                if (listParts !== 'err') {
+                    if (listParts.Parts !== undefined && listParts.Parts.length !== 0) {
                         //存在分片
                         let etag = listParts.Parts[0].ETag;
                         //计算文件的第一个分片的md5
@@ -400,13 +400,12 @@ async function existUpload({ bucket, fileInformation }) {
 //计算arrayBuffer的md5值
 async function getMD5({ arrayBuffer }) {
     console.log("arrayBuffer", arrayBuffer)
-    let md5 = await new Promise((resolve) => {
-        var spark = new SparkMD5.ArrayBuffer();
+    return await new Promise((resolve) => {
+        const spark = new SparkMD5.ArrayBuffer();
         spark.append(arrayBuffer);
         const m = spark.end();
         resolve(m);
     });
-    return md5;
 }
 
 //建立文件上传事件
@@ -421,8 +420,7 @@ async function createMultipartUpload({ bucket, key, type }) {//bucket:bucket  ke
     };
     const res = async () => {
         try {
-            const data = await s3.send(new CreateMultipartUploadCommand(params));
-            return data;
+            return await s3.send(new CreateMultipartUploadCommand(params));
         } catch (err) {
             console.log('建立上传事件失败：', err.message)
             return 'err';
@@ -445,8 +443,7 @@ async function uploadPart({ f, uploadId, key, bucket, num }) { //f:文件分片�
     };
     const res = async () => {
         try {
-            const data = await s3.send(new UploadPartCommand(params));
-            return data;
+            return await s3.send(new UploadPartCommand(params));
         } catch (err) {
             console.log('上传分片第 ' + num + ' 片错误信息', err.message)
             return 'err';
@@ -476,8 +473,7 @@ async function completeMultipartUpload({ bucket, key, sharding, uploadId }) {
     };
     const res = async () => {
         try {
-            const data = await s3.send(new CompleteMultipartUploadCommand(params));
-            return data
+            return await s3.send(new CompleteMultipartUploadCommand(params))
         } catch (err) {
             console.log("合并分片失败: ", err.message);
             return 'err';
@@ -498,8 +494,7 @@ async function listPartsCommand({ bucket, key, uploadId }) {
     };
     const res = async () => {
         try {
-            const data = await s3.send(new ListPartsCommand(params));
-            return data;
+            return await s3.send(new ListPartsCommand(params));
         } catch (err) {
             console.log("查询该文件已上传分片失败: " + err.message);
             return 'err';
@@ -520,8 +515,7 @@ async function listMultipartUploadsCommand({ bucket, key }) {
     };
     const res = async () => {
         try {
-            const data = await s3.send(new ListMultipartUploadsCommand(params));
-            return data;
+            return await s3.send(new ListMultipartUploadsCommand(params));
         } catch (err) {
             console.log("查询 " + key + " 文件是否存在上传事件失败: " + err.message);
             return 'err';
@@ -541,8 +535,7 @@ async function abortMultipartUpload({ bucket, key, uploadId }) {
     };
     const res = async () => {
         try {
-            const data = await s3.send(new AbortMultipartUploadCommand(params));
-            return data
+            return await s3.send(new AbortMultipartUploadCommand(params))
         } catch (err) {
             console.log("取消 " + key + " 文件连接失败: " + err.message);
             return 'err';
@@ -566,8 +559,7 @@ async function getObject({ bucket, fileInformation, count }) {
     };
     const res = async () => {
         try {
-            const data = await s3.send(new GetObjectCommand(params));
-            return data;
+            return await s3.send(new GetObjectCommand(params));
         } catch (err) {
             console.log('获取 ' + fileInformation.key + ' 文件失败：', err.message);
             return 'err';
