@@ -10,7 +10,7 @@
 
 #### 1、init
 
-传入以下参数，初始化s3客户端
+传入以下参数，初始化s3客户端  注意：传入的是一个map
 
 ![image](https://github.com/gk-1213/easy-s3/assets/76909981/fd43ddef-b6e3-487e-8c13-199c82780e79)
 
