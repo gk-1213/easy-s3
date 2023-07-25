@@ -9,7 +9,8 @@
 
 传入以下参数，初始化s3客户端
 
-![image-20230725111758958](C:\Users\龚可\AppData\Roaming\Typora\typora-user-images\image-20230725111758958.png)
+![image](https://github.com/gk-1213/easy-s3/assets/76909981/fd43ddef-b6e3-487e-8c13-199c82780e79)
+
 
 #### 2、fileChange
 
