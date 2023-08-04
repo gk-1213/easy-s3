@@ -6,7 +6,7 @@ Vue.use(VueRouter)
 const routes = [
   {
     path: '/',
-    name: '',
+    name: 'myS3',
     component: () => import('../views/MyS3.vue')
   },
 ]
