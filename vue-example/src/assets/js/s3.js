@@ -67,7 +67,7 @@ const {
     ListPartsCommand,//列出文件已上传的分片
     GetObjectCommand,//获取文件
 } = require("@aws-sdk/client-s3");
-import SparkMD5 from "/spark-md5.min.js";
+import SparkMD5 from "./spark-md5.min.js";
 
 
 const queue = new Queue();//添加文件的队列
