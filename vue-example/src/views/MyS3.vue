@@ -86,7 +86,7 @@ export default {
             if (isInQueue === false) {
                 //如果任务队列中没有这个文件上传任务，那么就加入到任务队列中
                 let inputFile = {
-                    key: file.name,//文件对象名(一般为文件的名称，也可根据需求自定)
+                    key: file.key,//文件对象名(一般为文件的名称，也可根据需求自定)
                     percentage: file.percentage,
                     status: file.status,
                     show: file.show,
